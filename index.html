@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Protótipo Jogo Michelino</title>
+    <style>
+      html, body {
+        height: 100%;
+        margin: 0;
+        background: #000;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        overflow: hidden;
+      }
+      canvas {
+        display: block;
+        background: #000;
+      }
+    </style>
+</head>
+<body>
+    <canvas id="canvas">Navegador incompatível com canvas.</canvas>
+
+    <!-- scripts clássicos: a ordem importa (quem vem depois usa o que veio antes) -->
+    <script src="src/config.js"></script>
+    <script src="src/dados/dialogos.js"></script>
+    <script src="src/dados/tiles.js"></script>
+    <script src="src/dados/mapas.js"></script>
+    <script src="src/dados/pecas.js"></script>
+    <script src="src/core/Atlas.js"></script>
+    <script src="src/core/Camera.js"></script>
+    <script src="src/core/Input.js"></script>
+    <script src="src/main.js"></script>
+</body>
+</html>
