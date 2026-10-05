@@ -1,4 +1,4 @@
-# Michelino Game Prototype
+# Computer Parts Search Game
 
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-yellow) ![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen) ![Status](https://img.shields.io/badge/status-partial%20prototype-blue)
 
