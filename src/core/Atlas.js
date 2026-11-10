@@ -27,4 +27,12 @@ class Atlas {
                       -this.larguraCelula / 2, dy, this.larguraCelula, this.alturaCelula);
         ctx.restore();
     }
+
+    // desenha o quadro de índice i de um atlas de uma linha só (sem direção, sem espelhar)
+    desenharQuadro(ctx, cx, cy, indice) {
+        let sx = indice * this.larguraCelula;
+        let dy = cy + tile / 2 - this.alturaCelula + AJUSTE_Y_SPRITE;
+        ctx.drawImage(this.img, sx, 0, this.larguraCelula, this.alturaCelula,
+                      cx - this.larguraCelula / 2, dy, this.larguraCelula, this.alturaCelula);
+    }
 }

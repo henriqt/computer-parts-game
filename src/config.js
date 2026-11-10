@@ -18,6 +18,9 @@ const TEMPO_TOQUE_RAPIDO = 167;         // se soltar a tecla antes disso, o play
 const ATRASO_CORRIDA = 84;              // atraso entre apertar o ALT e começar a correr
 const DURACAO_FADE = 268;               // tempo para escurecer e para clarear
 const DURACAO_QUADRO_PORTA = 134;       // tempo de cada quadro da porta abrindo
+// animação de pegar a peça: tempo de cada um dos 5 quadros do atlas (ms)
+// o último quadro (peça levantada) fica parado um pouco mais
+const DURACOES_COLETA = [134, 134, 134, 134, 500];
 
 // ---- direções e teclas ----
 const direcoes = {
@@ -56,6 +59,11 @@ const LINHAS_POR_PAGINA = 2;        // linhas de texto que cabem na caixa
 // Linhas do atlas: 0 parado | 1 e 2 andar (pé A e B) | 3 meio da corrida | 4 e 5 correr (A e B)
 const LINHA_PARADO = 0, LINHA_ANDAR = 1, LINHA_INTERMEDIARIO = 3, LINHA_CORRER = 4;
 const AJUSTE_Y_SPRITE = 0;      // sobe ou desce o personagem em pixels
+// peça na mão do player durante a coleta (quadrado da cor do tipo + letra, como no mapa)
+const TAMANHO_PECA_MAO = 8;
+const ALFA_PECA_MAO = 1;        // 1 = cor cheia (como no HUD); use ALFA_PECA para ficar igual ao mapa
+// centro da peça dentro da célula 24x24 de cada quadro da coleta (null = sem peça na mão)
+const PECA_NA_MAO = [null, null, { x: 12, y: 16 }, { x: 4, y: 11 }, { x: 5, y: 10 }];
 
 // ---- NPC placeholder (quando a imagem não carrega) ----
 const COR_NPC = "#1f9d8b";
