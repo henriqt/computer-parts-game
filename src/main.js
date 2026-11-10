@@ -11,8 +11,12 @@ const input = new Input();
 // ---- sprites ----
 // Cada personagem tem uma imagem só (atlas), numa grade de células 16x24.
 const COLUNAS_ATLAS = { down: 0, up: 1, left: 2, right: 2 };
-const ATLAS_JOGADOR = new Atlas("assets/sprites/placeholderfajti.png", 16, 24, COLUNAS_ATLAS);
-const ATLAS_PROFESSOR = new Atlas("assets/sprites/placeholderboneco.png", 16, 24, COLUNAS_ATLAS);
+const ATLAS_JOGADOR = new Atlas("assets/sprites/playerFajSprite.png", 16, 24, COLUNAS_ATLAS);
+const ATLAS_PROFESSOR = new Atlas("assets/sprites/michelinoSprite.png", 16, 24, COLUNAS_ATLAS);
+const ATLAS_JOGADOR_COLETA = new Atlas("assets/sprites/playerFajColeta.png", 24, 24, {});
+// caixa que representa as peças no mapa (igual para todos os tipos de peça)
+const IMG_CAIXA = new Image();
+IMG_CAIXA.src = "assets/sprites/caixa.png";
 
 // ---- movimento ----
 let correndoPasso = false;              // o passo atual é de corrida?
@@ -87,6 +91,9 @@ let transicao = null;       // { fase: "saindo" ou "entrando", inicio, porta }
 let portaAnim = null;       // { fase, inicio, porta, tileX, tileY, quadro }
 let esperarSoltar = false;  // depois da mensagem de tile bloqueado, só repete ao soltar a tecla
 let bumpDir = null;
+// animação de pegar a peça: { inicio, item, direcaoAntes }
+let coleta = null;
+const DURACAO_TOTAL_COLETA = DURACOES_COLETA.reduce((a, b) => a + b, 0);
 
 function init() {
     canvas = document.getElementById("canvas");
@@ -120,6 +127,7 @@ function comecarIntro() {
 function reiniciarJogo() {
     usarArea(inicioAreaNome);
     transicao = null;
+    coleta = null;
     portaAnim = null;
     jogador.x = inicioJogadorX;
     jogador.y = inicioJogadorY;
@@ -282,10 +290,16 @@ function falarComProfessor() {
     if (!professor.falou) {
         // primeira conversa: sorteia o pedido e conta a história
         pedidoAtual = PEDIDOS[Math.floor(Math.random() * PEDIDOS.length)];
-        abrirMensagem([pedidoAtual.fala, pedidoAtual.pedido + " Encontre as peças."], { aoFechar: iniciarBusca });
+        abrirMensagem([pedidoAtual.fala, FALA_PROFESSOR_TECNICO], { aoFechar: iniciarBusca });
     } else {
-        abrirMensagem(MSG_PROFESSOR_REPETE);
+        // depois disso, ele responde com uma das falas de espera
+        abrirMensagem(FALAS_PROFESSOR_REPETE[Math.floor(Math.random() * FALAS_PROFESSOR_REPETE.length)]);
     }
+}
+
+// nome da peça com a letra do modelo (as duas RAM de 32 GB têm o mesmo nome)
+function nomeDaPeca(peca) {
+    return peca.nome + " (" + peca.letra + ")";
 }
 
 // pegar ou trocar uma peça: mostra a descrição e pergunta se o player quer
@@ -293,12 +307,37 @@ function interagirComPeca(it) {
     let peca = it.peca;
     let atual = mochila[peca.tipo];
     let pergunta = atual
-        ? "Você já tem " + atual.nome + ". Trocar por " + peca.nome + "?"
-        : "Pegar " + peca.nome + "?";
-    abrirMensagem([peca.nome + ": " + peca.descricao, pergunta], {
+        ? "Você já tem " + nomeDaPeca(atual) + ". Trocar por " + nomeDaPeca(peca) + "?"
+        : "Pegar " + nomeDaPeca(peca) + "?";
+    abrirMensagem([nomeDaPeca(peca) + ": " + peca.descricao, pergunta], {
         opcoes: ["SIM", "NÃO"],
-        aoEscolher: function (escolha) { if (escolha === 0) pegarPeca(it); },
+        aoEscolher: function (escolha) { if (escolha === 0) iniciarColeta(it); },
     });
+}
+
+// começa a animação: o player vira para baixo e guarda a direção para devolver depois
+function iniciarColeta(it) {
+    coleta = { inicio: performance.now(), item: it, direcaoAntes: jogador.direcao };
+    jogador.direcao = "down";
+}
+
+// quando a animação acaba: devolve a direção e pega a peça (abre a mensagem)
+function atualizarColeta(agora) {
+    if (agora - coleta.inicio < DURACAO_TOTAL_COLETA) return;
+    let c = coleta;
+    coleta = null;
+    jogador.direcao = c.direcaoAntes;
+    pegarPeca(c.item);
+}
+
+// qual quadro (0 a 4) está na tela agora
+function quadroDaColeta() {
+    let t = performance.now() - coleta.inicio;
+    for (let i = 0; i < DURACOES_COLETA.length; i++) {
+        if (t < DURACOES_COLETA[i]) return i;
+        t -= DURACOES_COLETA[i];
+    }
+    return DURACOES_COLETA.length - 1;
 }
 
 function pegarPeca(it) {
@@ -307,16 +346,16 @@ function pegarPeca(it) {
     mochila[peca.tipo] = peca;
     if (antiga) {
         it.peca = antiga;       // a peça antiga fica no lugar da que foi pega
-        abrirMensagem("Você pegou " + peca.nome + " e deixou " + antiga.nome + " no lugar.");
+        abrirMensagem("Você pegou " + nomeDaPeca(peca) + " e deixou " + nomeDaPeca(antiga) + " no lugar.");
     } else {
         it.coletado = true;
-        abrirMensagem("Você pegou " + peca.nome + "!");
+        abrirMensagem("Você pegou " + nomeDaPeca(peca) + "!");
     }
 }
 
 // mesa do professor (depois da conversa): pergunta se o player quer montar o computador
 function interagirMesaProfessor() {
-    let faltam = TIPOS_PECA.filter(tipo => !mochila[tipo]);
+    let faltam = pedidoAtual.tipos.filter(tipo => !mochila[tipo]);
     let paginas = [];
     if (faltam.length > 0) paginas.push("Ainda faltam peças: " + faltam.join(", ") + ".");
     paginas.push("Montar o computador com as peças que você pegou?");
@@ -326,29 +365,35 @@ function interagirMesaProfessor() {
     });
 }
 
-// maior nota possível no pedido (melhor peça de cada tipo x peso do tipo)
-function notaMaxima(pedido) {
-    let total = 0;
-    for (let tipo of TIPOS_PECA) {
-        let melhor = Math.max(...PECAS.filter(p => p.tipo === tipo).map(p => p.notas[pedido.id]));
-        total += pedido.pesos[tipo] * melhor;
+// o professor confere as peças do PC pedido, uma por uma, e depois vem o fim de jogo
+function montarComputador() {
+    let acertos = 0;
+    let paginas = [];
+    for (let tipo of pedidoAtual.tipos) {
+        let peca = mochila[tipo];
+        if (!peca) {
+            paginas.push(NOME_TIPO[tipo] + ": " + FALA_PECA_FALTANDO);
+        } else if (peca.ideal.includes(pedidoAtual.id)) {
+            acertos++;
+            paginas.push(nomeDaPeca(peca) + ": " + FALA_PECA_CERTA);
+        } else {
+            paginas.push(nomeDaPeca(peca) + ": " + FALA_PECA_ERRADA);
+        }
     }
-    return total;
+    let perfeito = acertos === pedidoAtual.tipos.length;
+    if (perfeito) paginas.push(pedidoAtual.kit.descricao);      // só na montagem perfeita
+    abrirMensagem(paginas, { aoFechar: function () { finalizarJogo(acertos, perfeito); } });
 }
 
-// soma (nota da peça x peso do tipo) para o pedido e mostra a tela de fim de jogo
-function montarComputador() {
-    let pontos = 0;
-    for (let tipo of TIPOS_PECA) {
-        if (mochila[tipo]) pontos += pedidoAtual.pesos[tipo] * mochila[tipo].notas[pedidoAtual.id];
-    }
-    let maximo = notaMaxima(pedidoAtual);
+// tela de fim de jogo com o resultado
+function finalizarJogo(acertos, perfeito) {
+    let total = pedidoAtual.tipos.length;
     let frase;
-    if (pontos >= maximo * 0.85) frase = "Montagem perfeita!";
-    else if (pontos >= maximo * 0.6) frase = "Boa montagem.";
-    else if (pontos >= maximo * 0.4) frase = "Funciona, mas dava para melhorar.";
+    if (perfeito) frase = "Montagem perfeita: " + pedidoAtual.kit.nome.toUpperCase() + "!";
+    else if (acertos >= total - 1) frase = "Boa montagem.";
+    else if (acertos >= total / 2) frase = "Funciona, mas dava para melhorar.";
     else frase = "Esse computador não serve para a prova...";
-    resultadoFinal = ["Pedido: " + pedidoAtual.nome, "Nota: " + pontos + " de " + maximo, frase];
+    resultadoFinal = ["Pedido: " + pedidoAtual.nome, "Peças certas: " + acertos + " de " + total, frase];
     gameOver = true;
     gameOverEm = performance.now();
 }
@@ -401,13 +446,13 @@ function redimensionar() {
 
 // ---- reações ao teclado (o Input chama estas funções) ----
 function aoApertarEscape(repeticao) {
-    if (repeticao || telaInicio || gameOver || transicao || portaAnim) return;
+        if (repeticao || telaInicio || gameOver || transicao || portaAnim || coleta) return;
     alternarPausa();
 }
 
 function aoApertarEspaco(repeticao) {
     if (repeticao) return;
-    if (transicao || portaAnim || pausado) return;
+    if (transicao || portaAnim || pausado || coleta) return;
     if (telaInicio) {
         iniciarPartida();
     } else if (gameOver) {
@@ -431,7 +476,7 @@ function aoApertarDirecao(dir, repeticao) {
 
 // durante um passo a direção não muda; a troca acontece em atualizar(), quando o passo terminar
 function aoNovaDirecao(dir) {
-    if (!movendo && !mensagem && !telaInicio && !transicao && !portaAnim && !pausado && jogador.direcao !== dir) {
+    if (!movendo && !mensagem && !telaInicio && !transicao && !portaAnim && !coleta && !pausado && jogador.direcao !== dir) {
         jogador.direcao = dir;
         liberaGiroEm = performance.now() + TEMPO_TOQUE_RAPIDO;
     }
@@ -542,6 +587,7 @@ function atualizar(agora) {
     if (pausado) return;
     if (transicao) { atualizarTransicao(agora); return; }
     if (portaAnim && portaAnim.fase === "abrindo") { atualizarPortaAbrindo(agora); return; }
+    if (coleta) { atualizarColeta(agora); return; }
     if (gameOver || mensagem || telaInicio) return;     // com a caixa aberta o player fica parado
     if (movendo) {
         // se apertar o ALT no meio de um passo, o resto do passo vira corrida
@@ -636,11 +682,19 @@ function desenharMundo() {
 function desenharItens() {
     let deslocX = camera.deslocX;
     let deslocY = camera.deslocY;
-    let tamanho = 10;       // quadrado de 10x10 no meio do tile
+    let caixaPronta = IMG_CAIXA.complete && IMG_CAIXA.naturalWidth > 0;
+    let tamanho = 10;       // plano B (se a imagem não carregou): quadrado de 10x10 no meio do tile
     for (let it of itens) {
         if (it.coletado || it.area !== nomeArea) continue;
-        let px = it.x * tile - deslocX + (tile - tamanho) / 2;
-        let py = it.y * tile - deslocY + (tile - tamanho) / 2;
+        if (coleta && coleta.item === it) continue;     // a caixa some quando a animação de coleta começa
+        let tx = it.x * tile - deslocX;
+        let ty = it.y * tile - deslocY;
+        if (caixaPronta) {
+            ctx.drawImage(IMG_CAIXA, tx, ty);       // a caixa é igual para todos os tipos
+            continue;
+        }
+        let px = tx + (tile - tamanho) / 2;
+        let py = ty + (tile - tamanho) / 2;
         // quadrado meio transparente na cor do tipo, com a letra do modelo no meio
         ctx.globalAlpha = ALFA_PECA;
         ctx.fillStyle = COR_TIPO[it.peca.tipo];
@@ -710,6 +764,11 @@ function linhaDoJogador() {
 }
 
 function desenharJogador() {
+    if (coleta && ATLAS_JOGADOR_COLETA.pronto()) {
+        let quadro = quadroDaColeta();
+        ATLAS_JOGADOR_COLETA.desenharQuadro(ctx, LARGURA_TELA / 2, ALTURA_TELA / 2, quadro);
+        return;
+    }
     // o player sempre fica no centro da tela (120, 80)
     if (jogador.atlas.pronto()) {
         jogador.atlas.desenhar(ctx, LARGURA_TELA / 2, ALTURA_TELA / 2, jogador.direcao, linhaDoJogador());
