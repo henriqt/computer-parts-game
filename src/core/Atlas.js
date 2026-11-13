@@ -35,4 +35,10 @@ class Atlas {
         ctx.drawImage(this.img, sx, 0, this.larguraCelula, this.alturaCelula,
                       cx - this.larguraCelula / 2, dy, this.larguraCelula, this.alturaCelula);
     }
+
+    // desenha o quadro i de um atlas de uma linha só, com o canto superior esquerdo em (x, y)
+    desenharIcone(ctx, x, y, indice) {
+        ctx.drawImage(this.img, indice * this.larguraCelula, 0, this.larguraCelula, this.alturaCelula,
+                    x, y, this.larguraCelula, this.alturaCelula);
+    }
 }

@@ -26,3 +26,10 @@ const LINHAS_CONTROLES = [
     "ALT esquerdo (segurar): correr",
     "ESPAÇO: interagir / fechar mensagem",
 ];
+
+// ---- fim de jogo por tempo esgotado ----
+const TITULO_TEMPO_ESGOTADO = "GAME OVER";
+const LINHAS_TEMPO_ESGOTADO = [
+    "Você não conseguiu montar o PC",
+    "a tempo para o professor.",
+];

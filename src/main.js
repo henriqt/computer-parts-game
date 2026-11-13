@@ -14,6 +14,13 @@ const COLUNAS_ATLAS = { down: 0, up: 1, left: 2, right: 2 };
 const ATLAS_JOGADOR = new Atlas("assets/sprites/playerFajSprite.png", 16, 24, COLUNAS_ATLAS);
 const ATLAS_PROFESSOR = new Atlas("assets/sprites/michelinoSprite.png", 16, 24, COLUNAS_ATLAS);
 const ATLAS_JOGADOR_COLETA = new Atlas("assets/sprites/playerFajColeta.png", 24, 24, {});
+// ícones das peças no HUD (uma linha só: vermelho, azul, amarelo, verde)
+// a placa de vídeo ainda não tem atlas: usa o placeholder
+const ATLAS_HUD = {
+    "processador": new Atlas("assets/sprites/pecasCpus.png", 14, 13, {}),
+    "monitor": new Atlas("assets/sprites/pecasMonitores.png", 19, 26, {}),
+    "memória RAM": new Atlas("assets/sprites/pecasMemorias.png", 21, 20, {}),
+};
 // caixa que representa as peças no mapa (igual para todos os tipos de peça)
 const IMG_CAIXA = new Image();
 IMG_CAIXA.src = "assets/sprites/caixa.png";
@@ -63,6 +70,12 @@ let pausadoEm = 0;
 let telaInicio = true;      // tela de START (aparece quando a página abre)
 let gameOver = false;
 let gameOverEm = 0;
+
+// ---- timer da coleta ----
+let timerAtivo = false;     // só vira true depois da conversa com o professor
+let tempoRestante = TEMPO_LIMITE_SEGUNDOS * 1000;   // em milissegundos
+let ultimoAgora = 0;        // momento do quadro anterior (para medir o tempo entre quadros)
+let tituloFinal = "FIM DE JOGO";    // título da tela de fim (muda no game over por tempo)
 
 // enquanto a caixa está aberta: { paginas, pagina, aoFechar, opcoes, cursor, aoEscolher }
 // paginas = lista de textos (com mais de uma, aparece a setinha piscando)
@@ -147,12 +160,17 @@ function reiniciarJogo() {
     buscaAtiva = false;
     resetarNpcs();
     professor.falou = false;
+
+    timerAtivo = false;
+    tempoRestante = TEMPO_LIMITE_SEGUNDOS * 1000;
+    tituloFinal = "FIM DE JOGO";
 }
 
 // fim da conversa com o professor: mostra o HUD e sorteia as peças
 function iniciarBusca() {
     professor.falou = true;
     buscaAtiva = true;
+    timerAtivo = true;
     gerarItens();
 }
 
@@ -203,7 +221,7 @@ function pontosDePeca(nome) {
         for (let x = 0; x < area.largura; x++) {
             let tp = tipoTile[area.mapa[y][x]];
             if (nome === "sala") {
-                if (tp.mesa && !ehMesaProfessor(x, y)) pontos.push({ x: x, y: y });
+                if (tp.mesa && !tp.computador && !ehMesaProfessor(x, y)) pontos.push({ x: x, y: y });
             } else if (tp.nome === "chao" && !pertoDePorta(nome, x, y)) {
                 pontos.push({ x: x, y: y });
             }
@@ -227,7 +245,8 @@ function gerarItens() {
         }
         for (let ponto of escolhidos) {
             if (proxima >= pecas.length) break;
-            itens.push({ area: nome, x: ponto.x, y: ponto.y, peca: pecas[proxima], coletado: false });
+            let desvio = DESVIOS_CAIXA[Math.floor(Math.random() * DESVIOS_CAIXA.length)];
+            itens.push({ area: nome, x: ponto.x, y: ponto.y, peca: pecas[proxima], coletado: false, desvio: desvio });
             proxima++;
         }
     }
@@ -292,14 +311,14 @@ function falarComProfessor() {
         pedidoAtual = PEDIDOS[Math.floor(Math.random() * PEDIDOS.length)];
         abrirMensagem([pedidoAtual.fala, FALA_PROFESSOR_TECNICO], { aoFechar: iniciarBusca });
     } else {
-        // depois disso, ele responde com uma das falas de espera
-        abrirMensagem(FALAS_PROFESSOR_REPETE[Math.floor(Math.random() * FALAS_PROFESSOR_REPETE.length)]);
+        // depois disso, ele lembra qual é o PC pedido (de forma resumida)
+        abrirMensagem(pedidoAtual.lembrete);
     }
 }
 
-// nome da peça com a letra do modelo (as duas RAM de 32 GB têm o mesmo nome)
+// nome da peça, sem a letra do modelo
 function nomeDaPeca(peca) {
-    return peca.nome + " (" + peca.letra + ")";
+    return peca.nome;
 }
 
 // pegar ou trocar uma peça: mostra a descrição e pergunta se o player quer
@@ -394,6 +413,7 @@ function finalizarJogo(acertos, perfeito) {
     else if (acertos >= total / 2) frase = "Funciona, mas dava para melhorar.";
     else frase = "Esse computador não serve para a prova...";
     resultadoFinal = ["Pedido: " + pedidoAtual.nome, "Peças certas: " + acertos + " de " + total, frase];
+    tituloFinal = "FIM DE JOGO";
     gameOver = true;
     gameOverEm = performance.now();
 }
@@ -581,10 +601,47 @@ function atualizarTransicao(agora) {
         transicao = null;
     }
 }
+// desconta o tempo que passou desde o quadro anterior
+function atualizarTimer(dt) {
+    if (!timerAtivo || gameOver || telaInicio) return;
+    tempoRestante -= dt;
+    if (tempoRestante <= 0) {
+        tempoRestante = 0;
+        acabouOTempo();
+    }
+}
+
+// o tempo acabou: cancela o que estiver acontecendo e mostra a tela de game over
+function acabouOTempo() {
+    transicao = null;
+    portaAnim = null;
+    coleta = null;
+    mensagem = null;
+    movendo = false;
+    tituloFinal = TITULO_TEMPO_ESGOTADO;
+    resultadoFinal = LINHAS_TEMPO_ESGOTADO;
+    gameOver = true;
+    gameOverEm = performance.now();
+}
+
+// 03:00:000 (minutos : segundos : milissegundos)
+function formatarTempo(ms) {
+    ms = Math.max(0, Math.floor(ms));
+    let min = Math.floor(ms / 60000);
+    let seg = Math.floor((ms % 60000) / 1000);
+    let mil = ms % 1000;
+    return String(min).padStart(2, "0") + ":" + String(seg).padStart(2, "0") + ":" + String(mil).padStart(3, "0");
+}
 
 // ---- loop principal: atualiza o jogo ----
 function atualizar(agora) {
+    // tempo desde o quadro anterior (limitado, para uma aba em segundo plano não gastar o timer de uma vez)
+    let dt = Math.min(agora - ultimoAgora, 100);
+    ultimoAgora = agora;
+
     if (pausado) return;
+    atualizarTimer(dt);
+
     if (transicao) { atualizarTransicao(agora); return; }
     if (portaAnim && portaAnim.fase === "abrindo") { atualizarPortaAbrindo(agora); return; }
     if (coleta) { atualizarColeta(agora); return; }
@@ -636,6 +693,100 @@ function atualizar(agora) {
     }
 }
 
+// o tile (x, y) é de mesa?
+function ehTileMesa(x, y) {
+    if (x < 0 || y < 0 || x >= mundoLargura || y >= mundoAltura) return false;
+    return tipoTile[mapa[y][x]].mesa;
+}
+
+// contorno dos lados da mesa (dentro do próprio tile)
+function desenharTopoMesa(wx, wy, tx, ty) {
+    ctx.fillStyle = COR_MESA_BORDA;
+    ctx.fillRect(tx, ty, 1, tile);                  // lado esquerdo
+    ctx.fillRect(tx + tile - 1, ty, 1, tile);       // lado direito
+}
+
+// topo da mesa que sobe sobre o tile de cima (só no primeiro tile da mesa)
+function desenharSobraTopoMesa(wx, wy, tx, ty) {
+    if (ehTileMesa(wx, wy - 1)) return;
+    let y0 = ty - SOBRA_TOPO_MESA;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(tx, y0, tile, SOBRA_TOPO_MESA);
+    ctx.fillStyle = COR_MESA_BORDA;
+    ctx.fillRect(tx, y0, tile, 1);                  // linha de cima
+    ctx.fillRect(tx, y0, 1, SOBRA_TOPO_MESA);
+    ctx.fillRect(tx + tile - 1, y0, 1, SOBRA_TOPO_MESA);
+}
+
+// se for o último tile da mesa, desenha a frente (lateral) na base do tile
+function desenharFrenteMesa(wx, wy, tx, ty) {
+    if (ehTileMesa(wx, wy + 1)) return;             // não é o último tile da mesa
+    let y0 = ty + tile - ALTURA_FRENTE_MESA;
+    ctx.fillStyle = COR_MESA_FRENTE;
+    ctx.fillRect(tx, y0, tile, ALTURA_FRENTE_MESA);
+    ctx.fillStyle = COR_MESA_BORDA;
+    ctx.fillRect(tx, y0, tile, 1);                  // quina entre o topo e a frente
+    ctx.fillRect(tx, y0, 1, ALTURA_FRENTE_MESA);
+    ctx.fillRect(tx + tile - 1, y0, 1, ALTURA_FRENTE_MESA);
+    ctx.fillStyle = COR_MESA_BASE;
+    ctx.fillRect(tx, ty + tile - 1, tile, 1);       // base escura
+}
+
+// o tile (x, y) é de janela?
+function ehTileJanela(x, y) {
+    if (x < 0 || y < 0 || x >= mundoLargura || y >= mundoAltura) return false;
+    return !!tipoTile[mapa[y][x]].janela;
+}
+
+// vidro contínuo: o contorno só aparece no topo e onde a janela termina na parede
+function desenharJanela(wx, wy, tx, ty) {
+    // sombra logo abaixo do topo
+    ctx.fillStyle = COR_JANELA_SOMBRA;
+    ctx.fillRect(tx, ty + 1, tile, 2);
+
+    // reflexo na diagonal, só em 1 tile a cada 3 (para o vidro não ficar poluído)
+    if (wx % 3 === 1) {
+        ctx.fillStyle = COR_JANELA_REFLEXO_1;
+        for (let i = 0; i < 8; i++) ctx.fillRect(tx + 3 + i, ty + 13 - i, 2, 1);
+        ctx.fillStyle = COR_JANELA_REFLEXO_2;
+        for (let i = 0; i < 4; i++) ctx.fillRect(tx + 9 + i, ty + 13 - i, 1, 1);
+    }
+
+    // contorno
+    ctx.fillStyle = COR_JANELA_CONTORNO;
+    if (!ehTileJanela(wx, wy - 1)) ctx.fillRect(tx, ty, tile, 1);                   // topo
+    // pontas: só onde a janela encontra a parede (na borda do mapa o vidro vai até o fim)
+    if (wx > 0 && !ehTileJanela(wx - 1, wy)) ctx.fillRect(tx, ty, 1, tile);
+    if (wx < mundoLargura - 1 && !ehTileJanela(wx + 1, wy)) ctx.fillRect(tx + tile - 1, ty, 1, tile);
+    if (JANELA_CONTORNO_EMBAIXO && !ehTileJanela(wx, wy + 1)) ctx.fillRect(tx, ty + tile - 1, tile, 1);
+}
+
+// partes das mesas que passam para cima do tile de cima (topo da mesa e topo dos computadores).
+// são desenhadas DEPOIS dos personagens, então quem está atrás da mesa nunca fica por cima dela
+function desenharSobrasMesas() {
+    let inicioX = Math.max(0, Math.floor(camera.origemX));
+    let inicioY = Math.max(0, Math.floor(camera.origemY));
+    let fimX = Math.min(mundoLargura - 1, Math.ceil(camera.origemX + tilesVisiveisX));
+    let fimY = Math.min(mundoAltura - 1, Math.ceil(camera.origemY + tilesVisiveisY));
+
+    for (let wy = inicioY; wy <= fimY; wy++) {
+        for (let wx = inicioX; wx <= fimX; wx++) {
+            let tp = tipoTile[mapa[wy][wx]];
+            if (!tp.mesa) continue;
+            let tx = wx * tile - camera.deslocX;
+            let ty = wy * tile - camera.deslocY;
+            desenharSobraTopoMesa(wx, wy, tx, ty);
+            if (tp.detalhes) {
+                for (let d of tp.detalhes) {
+                    if (d.y >= 0) continue;         // só as linhas que ficam acima do tile
+                    ctx.fillStyle = d.cor;
+                    ctx.fillRect(tx + d.x, ty + d.y, d.w, d.h);
+                }
+            }
+        }
+    }
+}
+
 // ---- desenho ----
 function desenharMundo() {
     // fundo preto
@@ -661,12 +812,15 @@ function desenharMundo() {
             let ty = wy * tile - deslocY;
             ctx.fillStyle = tp.cor;
             ctx.fillRect(tx, ty, tile, tile);
+            if (tp.mesa) desenharTopoMesa(wx, wy, tx, ty);
             if (tp.detalhes) {
                 for (let d of tp.detalhes) {
+                    if (d.y < 0) continue;
                     ctx.fillStyle = d.cor;
                     ctx.fillRect(tx + d.x, ty + d.y, d.w, d.h);
                 }
             }
+            if (tp.mesa) desenharFrenteMesa(wx, wy, tx, ty);
             if (tp.porta) {
                 // porta fechada, a não ser que seja a que está abrindo agora
                 let quadro = (portaAnim && portaAnim.tileX === wx && portaAnim.tileY === wy) ? portaAnim.quadro : 0;
@@ -675,6 +829,7 @@ function desenharMundo() {
                     ctx.fillRect(tx + d.x, ty + d.y, d.w, d.h);
                 }
             }
+            if (tp.janela) desenharJanela(wx, wy, tx, ty);
         }
     }
 }
@@ -690,7 +845,7 @@ function desenharItens() {
         let tx = it.x * tile - deslocX;
         let ty = it.y * tile - deslocY;
         if (caixaPronta) {
-            ctx.drawImage(IMG_CAIXA, tx, ty);       // a caixa é igual para todos os tipos
+            ctx.drawImage(IMG_CAIXA, tx + it.desvio.x, ty + it.desvio.y);       // a caixa é igual para todos os tipos
             continue;
         }
         let px = tx + (tile - tamanho) / 2;
@@ -820,35 +975,106 @@ function desenharBoneco(cx, cy, direcao, corCorpo, corSeta) {
     ctx.fill();
 }
 
+// silhueta do slot vazio: o formato da peça sem o contorno, pintado com COR_HUD_VAZIO
+const silhuetas = {};
+function silhuetaDoTipo(tipo) {
+    if (silhuetas[tipo]) return silhuetas[tipo];
+    let a = ATLAS_HUD[tipo];
+    let w = a.larguraCelula, h = a.alturaCelula;
+    let c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    let g = c.getContext("2d");
+    g.drawImage(a.img, 0, 0, w, h, 0, 0, w, h);            // quadro 0: só o formato importa
+
+    // tira o contorno de 1 px: só ficam os pixels que têm pixel da peça nos 4 vizinhos
+    let copia = document.createElement("canvas");
+    copia.width = w;
+    copia.height = h;
+    copia.getContext("2d").drawImage(c, 0, 0);
+    g.globalCompositeOperation = "destination-in";         // mantém só onde a cópia deslocada tem pixel
+    g.drawImage(copia, 1, 0);
+    g.drawImage(copia, -1, 0);
+    g.drawImage(copia, 0, 1);
+    g.drawImage(copia, 0, -1);
+
+    // pinta o que sobrou
+    g.globalCompositeOperation = "source-in";
+    g.fillStyle = COR_HUD_VAZIO;
+    g.fillRect(0, 0, w, h);
+    silhuetas[tipo] = c;
+    return c;
+}
+
+// tipos sem atlas (por enquanto a placa de vídeo): retângulo com o texto do tipo
+function desenharSlotPlaceholder(tipo, peca, sx, sy) {
+    let px = sx + 2, py = sy + 7, pl = HUD_SLOT_L - 4, pa = 12;
+    ctx.globalAlpha = 1;
+    // magenta = a peça está sem "cor" no pecas.js (ajuda a achar o erro do item 1)
+    ctx.fillStyle = peca ? (COR_PECA_HUD[peca.cor] || "#ff00ff") : COR_HUD_VAZIO;
+    ctx.fillRect(px, py, pl, pa);
+    ctx.globalAlpha = peca ? 1 : 0.5;
+    desenharLetraPeca(TEXTO_PLACEHOLDER_HUD[tipo] || "?", px + pl / 2, py + pa / 2, 7);
+    ctx.globalAlpha = 1;
+}
+
+function desenharSlotHud(tipo, sx, sy) {
+    let peca = mochila[tipo];
+    let atlas = ATLAS_HUD[tipo];
+
+    // fundo do slot
+    ctx.globalAlpha = HUD_ALFA_FUNDO;
+    ctx.fillStyle = COR_HUD_FUNDO;
+    ctx.fillRect(sx, sy, HUD_SLOT_L, HUD_SLOT_A);
+    ctx.globalAlpha = 1;
+
+    if (!atlas) { desenharSlotPlaceholder(tipo, peca, sx, sy); return; }
+    if (!atlas.pronto()) return;
+
+    // centraliza a célula no slot
+    let ix = sx + Math.floor((HUD_SLOT_L - atlas.larguraCelula) / 2);
+    let iy = sy + Math.floor((HUD_SLOT_A - atlas.alturaCelula) / 2);
+    if (peca) {
+        atlas.desenharIcone(ctx, ix, iy, peca.cor);
+    } else {
+        ctx.globalAlpha = HUD_ALFA_VAZIO;
+        ctx.drawImage(silhuetaDoTipo(tipo), ix, iy);
+        ctx.globalAlpha = 1;
+    }
+}
+
 function desenharHud() {
-    let tamanho = 12;
-    let espaco = 4;
     let margem = 4;
     let y = margem;
-    // um quadrado para cada tipo de peça, só depois da conversa com o professor
-    // com a peça: cor cheia e a letra do modelo | sem a peça: cor transparente e sem letra
+    // um slot para cada tipo de peça, só depois da conversa com o professor
     if (buscaAtiva) {
         for (let i = 0; i < TIPOS_PECA.length; i++) {
-            let peca = mochila[TIPOS_PECA[i]];
-            let hx = margem + i * (tamanho + espaco);
-            ctx.fillStyle = COR_TIPO[TIPOS_PECA[i]];
-            ctx.globalAlpha = peca ? 1 : 0.4;
-            ctx.fillRect(hx, y, tamanho, tamanho);
-            ctx.globalAlpha = 1;
-            if (peca) desenharLetraPeca(peca.letra, hx + tamanho / 2, y + tamanho / 2, 9);
+            desenharSlotHud(TIPOS_PECA[i], margem + i * (HUD_SLOT_L + HUD_ESPACO), y);
         }
     }
 
     // "R" aparece ao segurar o ALT (só com o jogo rodando)
-    if (input.correr && !telaInicio && !gameOver && !pausado) {
-        let rx = margem + (buscaAtiva ? TIPOS_PECA.length * (tamanho + espaco) : 0);
+    if (MOSTRAR_R_CORRER && input.correr && !telaInicio && !gameOver && !pausado) {
+        let rx = margem + (buscaAtiva ? TIPOS_PECA.length * (HUD_SLOT_L + HUD_ESPACO) : 0);
         ctx.font = "bold 10px monospace";
         ctx.textAlign = "left";
         ctx.textBaseline = "middle";
         ctx.fillStyle = "#000000";
-        ctx.fillText("R", rx + 1, y + tamanho / 2 + 1);     // sombra
+        ctx.fillText("R", rx + 1, y + HUD_SLOT_A / 2 + 1);     // sombra
         ctx.fillStyle = "#ffffff";
-        ctx.fillText("R", rx, y + tamanho / 2);
+        ctx.fillText("R", rx, y + HUD_SLOT_A / 2);
+    }
+
+    // timer no canto superior direito (visual igual ao "R" de debug, por enquanto)
+    if (timerAtivo) {
+        let texto = formatarTempo(tempoRestante);
+        ctx.font = "bold 10px monospace";
+        ctx.textAlign = "right";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = "#000000";
+        ctx.fillText(texto, LARGURA_TELA - margem + 1, y + 6);      // sombra
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(texto, LARGURA_TELA - margem, y + 5);
     }
 }
 
@@ -976,11 +1202,12 @@ function desenhar(agora) {
     if (!telaInicio) desenharItens();
     if (!telaInicio) desenharSetasPorta();
     desenharPersonagens();
+    desenharSobrasMesas();
     desenharHud();
     if (mensagem) desenharCaixaMensagem();
     desenharFade(agora);
     if (telaInicio) desenharTela("ENCONTRE AS PEÇAS", "barra de espaço para iniciar", LINHAS_CONTROLES);
-    if (gameOver) desenharTela("FIM DE JOGO", "barra de espaço para reiniciar", resultadoFinal);
+    if (gameOver) desenharTela(tituloFinal, "barra de espaço para reiniciar", resultadoFinal);
     if (pausado) desenharTela("JOGO PAUSADO", "pressione esc para despausar", LINHAS_CONTROLES);
     requestAnimationFrame(desenhar);
 }
