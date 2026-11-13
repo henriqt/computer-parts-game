@@ -1,6 +1,7 @@
 # Computer Parts Search Game
 
 ![HTML5](https://img.shields.io/badge/HTML5-Canvas-orange) ![JavaScript](https://img.shields.io/badge/JavaScript-Vanilla-yellow) ![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen) ![Status](https://img.shields.io/badge/status-partial%20prototype-blue)
+[![Play Now](https://img.shields.io/badge/play-now-brightgreen)](https://henriqt.github.io/computer-parts-game)
 
 A top-down exploration game built with HTML5 Canvas and plain JavaScript, no libraries and no build step. You play a student who must find scattered computer parts and assemble the right machine for the professor, before an exam sabotaged by another student. Made for the Computer Graphics course (Computer Science, UNIFAJ). Look and feel inspired by Pokémon Emerald.
 
@@ -56,15 +57,25 @@ A top-down exploration game built with HTML5 Canvas and plain JavaScript, no lib
 
 ## Running the Game
 
-### Prerequisites
+### Play online
+
+The game is hosted on GitHub Pages, so there is nothing to install:
+
+**https://henriqt.github.io/computer-parts-game**
+
+Open the link in a desktop browser (a keyboard is required). If the page looks outdated after an update, press `Ctrl + F5` to bypass the cache.
+
+### Run locally
+
+#### Prerequisites
 
 - Any modern browser.
 
-### Steps
+#### Steps
 
 ```bash
 git clone https://github.com/henriqt/computer-parts-game.git
-cd <computer-parts-game>
+cd computer-parts-game
 ```
 
 Then double-click `index.html`. No server needed.
