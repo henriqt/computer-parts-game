@@ -4,29 +4,30 @@
 // Tamanho: 19 colunas x 16 linhas (2 de parede no topo). A mesa do professor fica na coluna 17.
 // A coluna 0 (fundo da sala) fica só com mesas, sem computadores.
 // O corredor da sala são as linhas 8 e 9. A saída é embaixo, no tapete (coluna 17).
+// > = cadeira do aluno | < = cadeira do professor
 const layoutSala = [
-    "WWWWWWWWWWWWWWWWWWW",   //  0  parede
+    "WJJJJJJJJJJJJJJJWWW",   //  0  parede com janelas
     "WWWWWWWWWWWWWWWWWWW",   //  1  parede
     "D.D.D.D.D.D.D.D..D.",   //  2
-    "D.C.C.C.C.C.C.C..E.",   //  3
+    "D>C>C>C>C>C>C>C..E<",   //  3
     "D.D.D.D.D.D.D.D..D.",   //  4
-    "D.C.C.C.C.C.C.C....",   //  5
+    "D>C>C>C>C>C>C>C....",   //  5
     "D.D.D.D.D.D.D.D....",   //  6
-    "D.C.C.C.C.C.C.C....",   //  7
+    "D>C>C>C>C>C>C>C....",   //  7
     "...................",   //  8  corredor da sala
     "...................",   //  9  corredor da sala
-    "D.C.C.C.C.C.C.C....",   // 10
+    "D>C>C>C>C>C>C>C....",   // 10
     "D.D.D.D.D.D.D.D....",   // 11
-    "D.C.C.C.C.C.C.C....",   // 12
+    "D>C>C>C>C>C>C>C....",   // 12
     "D.D.D.D.D.D.D.D....",   // 13
-    "D.C.C.C.C.C.C.C....",   // 14
+    "D>C>C>C>C>C>C>C....",   // 14
     "D.D.D.D.D.D.D.D..T.",   // 15  tapete da saída (a porta fica logo abaixo, fora do mapa)
 ];
 
 // Corredor (área aberta): 25 x 5 tiles. P = porta de uma sala (colunas 7 e 17).
 // Nas pontas, 3 tiles de degradê escuro.
 const layoutCorredor = [
-    "WWWWWWWWWWWWWWWWWWWWWWWWW",   //  0  parede
+    "JJJJJJWWWJJJJJJJWWWJJJJJJ",   //  0  parede com janelas
     "WWWWWWWPWWWWWWWWWPWWWWWWW",   //  1  portas das salas
     "321...................123",   //  2
     "321...................123",   //  3
@@ -37,11 +38,11 @@ const layoutCorredor = [
 const layoutTI = [
     "WWWWWW",   //  0  parede
     "WWWWWW",   //  1  parede
-    "......",   //  2
-    "......",   //  3
-    "......",   //  4
-    "......",   //  5
-    "......",   //  6
+    "D...>I",   //  2
+    "D....D",   //  3
+    "D...>I",   //  4
+    "D....D",   //  5
+    "....>I",   //  6
     "......",   //  7
     "..TT..",   //  8  tapetes de saída
 ];
